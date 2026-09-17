@@ -1,27 +1,37 @@
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
 
 from config.settings import DEFAULT_TIMEOUT
 from utils.logger import get_logger
 
 
 class BasePage:
+    """所有 Page Object 的基础页面类"""
 
     def __init__(self, driver):
         self.driver = driver
+
         self.wait = WebDriverWait(
             driver,
             DEFAULT_TIMEOUT
         )
+
         self.logger = get_logger(
             self.__class__.__name__
         )
 
+    # =========================
+    # 基础页面操作
+    # =========================
+
     def open(self, url):
         """打开网页"""
+
         self.logger.info(
             f"打开页面：{url}"
         )
+
         self.driver.get(url)
 
     def input(self, locator, text):
@@ -60,17 +70,49 @@ class BasePage:
         )
 
     def get_text(self, locator):
-        """获取元素文字"""
+        """
+        获取元素文字。
+
+        如果页面 DOM 更新导致元素变成 stale，
+        则重新定位元素并继续等待。
+        """
 
         self.logger.info(
             f"获取元素文字：{locator}"
         )
 
-        element = self.wait.until(
-            EC.visibility_of_element_located(locator)
-        )
+        def read_text(driver):
+            try:
+                # 每一次等待循环都重新定位元素
+                element = driver.find_element(
+                    *locator
+                )
 
-        text = element.text
+                # 元素不可见时继续等待
+                if not element.is_displayed():
+                    return False
+
+                # 获取当前最新元素的文字
+                text = element.text
+
+                # 文字暂时为空时继续等待
+                if not text:
+                    return False
+
+                return text
+
+            except StaleElementReferenceException:
+                # DOM 更新导致当前元素失效
+                # 返回 False，让 WebDriverWait 再次尝试
+                self.logger.info(
+                    f"元素已失效，重新定位：{locator}"
+                )
+
+                return False
+
+        text = self.wait.until(
+            read_text
+        )
 
         self.logger.info(
             f"获取到文字：{text}"
@@ -86,8 +128,7 @@ class BasePage:
         """获取元素属性"""
 
         self.logger.info(
-            f"获取元素属性："
-            f"{locator} -> {attribute_name}"
+            f"获取元素属性：{locator} -> {attribute_name}"
         )
 
         element = self.wait.until(
@@ -101,11 +142,29 @@ class BasePage:
         )
 
         self.logger.info(
-            f"属性值："
-            f"{attribute_name} = {value}"
+            f"属性值：{attribute_name} = {value}"
         )
 
         return value
+
+    # =========================
+    # URL
+    # =========================
+
+    def wait_for_url_contains(self, text):
+        """等待 URL 包含指定内容"""
+
+        self.logger.info(
+            f"等待 URL 包含：{text}"
+        )
+
+        self.wait.until(
+            EC.url_contains(text)
+        )
+
+        self.logger.info(
+            f"URL 已切换：{self.driver.current_url}"
+        )
 
     # =========================
     # 多窗口
@@ -127,7 +186,9 @@ class BasePage:
     def get_all_windows(self):
         """获取所有窗口句柄"""
 
-        windows = self.driver.window_handles
+        windows = (
+            self.driver.window_handles
+        )
 
         self.logger.info(
             f"当前窗口数量：{len(windows)}"
@@ -146,15 +207,14 @@ class BasePage:
         )
 
         self.logger.info(
-            f"切换窗口成功："
-            f"{window_handle}"
+            f"切换窗口成功：{window_handle}"
         )
 
     def switch_to_new_window(
         self,
         old_windows
     ):
-        """等待新窗口出现，并自动切换"""
+        """等待新窗口出现并切换"""
 
         self.logger.info(
             "等待新窗口出现"
@@ -179,8 +239,7 @@ class BasePage:
                 )
 
                 self.logger.info(
-                    f"已切换到新窗口："
-                    f"{window}"
+                    f"已切换到新窗口：{window}"
                 )
 
                 return window
@@ -189,8 +248,11 @@ class BasePage:
     # iframe
     # =========================
 
-    def switch_to_frame(self, frame):
-        """切换进入 iframe"""
+    def switch_to_frame(
+        self,
+        frame
+    ):
+        """进入 iframe"""
 
         self.logger.info(
             f"等待并进入 iframe：{frame}"
@@ -207,7 +269,7 @@ class BasePage:
         )
 
     def switch_to_default_content(self):
-        """从 iframe 切回主页面"""
+        """返回主页面"""
 
         self.driver.switch_to.default_content()
 
@@ -255,7 +317,7 @@ class BasePage:
         )
 
     def dismiss_alert(self):
-        """点击 Confirm / Prompt 取消"""
+        """点击 Alert 取消"""
 
         alert = self.wait_for_alert()
 
@@ -265,7 +327,10 @@ class BasePage:
             "Alert 已点击取消"
         )
 
-    def input_alert(self, text):
+    def input_alert(
+        self,
+        text
+    ):
         """向 Prompt 输入文字"""
 
         alert = self.wait_for_alert()

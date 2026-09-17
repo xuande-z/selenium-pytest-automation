@@ -1,0 +1,38 @@
+[
+  {
+    "case": "wrong_username",
+    "username": "wrong_user",
+    "password": "secret_sauce",
+    "expected_error": "Username and password do not match"
+  },
+  {
+    "case": "wrong_password",
+    "username": "standard_user",
+    "password": "123456",
+    "expected_error": "Username and password do not match"
+  },
+  {
+    "case": "wrong_username_and_password",
+    "username": "wrong_user",
+    "password": "123456",
+    "expected_error": "Username and password do not match"
+  },
+  {
+    "case": "empty_username",
+    "username": "",
+    "password": "secret_sauce",
+    "expected_error": "Username is required"
+  },
+  {
+    "case": "empty_password",
+    "username": "standard_user",
+    "password": "",
+    "expected_error": "Password is required"
+  },
+  {
+    "case": "empty_username_and_password",
+    "username": "",
+    "password": "",
+    "expected_error": "Username is required"
+  }
+]
